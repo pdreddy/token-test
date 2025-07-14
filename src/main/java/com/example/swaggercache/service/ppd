@@ -283,3 +283,126 @@ class CertificateServiceTest {
     }
 }
 
+
+
+package com.example.certificate; // Adjust to your actual package
+
+import com.example.certificate.controller.CertificateController;
+import com.example.certificate.dto.CertificateResponse;
+import com.example.certificate.service.CertificateService;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.security.Principal;
+import java.util.Base64;
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CertificateControllerTest {
+
+    @InjectMocks
+    private CertificateController certificateController;
+
+    @Mock
+    private CertificateService certificateService;
+
+    @Mock
+    private HttpServletRequest httpServletRequest;
+
+    @Mock
+    private Principal mockPrincipal;
+
+    @BeforeEach
+    void setup() {
+        when(httpServletRequest.getUserPrincipal()).thenReturn(mockPrincipal);
+        when(mockPrincipal.getName()).thenReturn("admin_user");
+    }
+
+    @Test
+    void testSaveCert_Success() throws Exception {
+        String samplePem = "-----BEGIN CERTIFICATE-----\n" +
+                Base64.getEncoder().encodeToString("test".getBytes()) +
+                "\n-----END CERTIFICATE-----";
+
+        CertificateResponse response = new CertificateResponse();
+        when(certificateService.saveCertificate(any())).thenReturn(response);
+
+        ResponseEntity<?> result = certificateController.saveCert("clientId", samplePem, httpServletRequest);
+
+        assertEquals(HttpStatus.CREATED, result.getStatusCode());
+    }
+
+    @Test
+    void testSaveCert_InvalidPem_ThrowsException() throws Exception {
+        String invalidPem = "not-a-certificate";
+
+        ResponseEntity<?> result = certificateController.saveCert("clientId", invalidPem, httpServletRequest);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+        assertTrue(result.getBody().toString().contains("Failed to process certificate"));
+    }
+
+    @Test
+    void testFindAllCerts_Success() {
+        List<CertificateResponse> responses = List.of(new CertificateResponse());
+        when(certificateService.getAllCertificates()).thenReturn(responses);
+
+        ResponseEntity<List<CertificateResponse>> response = certificateController.findAllCerts(httpServletRequest);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(1, response.getBody().size());
+    }
+
+    @Test
+    void testGetCertificatesByClientId_Success() {
+        List<CertificateResponse> responses = List.of(new CertificateResponse());
+        when(certificateService.getCertificatesByClientId("client123")).thenReturn(responses);
+
+        ResponseEntity<List<CertificateResponse>> response = certificateController.getCertificatesByClientId("client123");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(1, response.getBody().size());
+    }
+
+    @Test
+    void testGetJwks_Success() {
+        CertificateResponse response = new CertificateResponse();
+        response.setJwk("{\"kty\":\"RSA\"}");
+
+        when(certificateService.getCertificatesByClientId("client123"))
+            .thenReturn(List.of(response));
+
+        ResponseEntity<String> jwks = certificateController.getJwks("client123");
+
+        assertEquals(HttpStatus.OK, jwks.getStatusCode());
+        assertTrue(jwks.getBody().contains("kty"));
+    }
+
+    @Test
+    void testGetJwks_WithErrorInJwk() {
+        CertificateResponse response = new CertificateResponse();
+        response.setJwk("invalid");
+
+        when(certificateService.getCertificatesByClientId("client123"))
+            .thenReturn(List.of(response));
+
+        ResponseEntity<String> jwks = certificateController.getJwks("client123");
+
+        assertEquals(HttpStatus.OK, jwks.getStatusCode());
+    }
+}
+
