@@ -405,4 +405,13 @@ class CertificateControllerTest {
         assertEquals(HttpStatus.OK, jwks.getStatusCode());
     }
 }
+String samplePem = "-----BEGIN CERTIFICATE-----\n" +
+        "MIIBszCCAVugAwIBAgIUYmEIRqkqMJWAcijrxakTHYKqQm4wCgYIKoZIzj0EAwIw\n" +
+        "EjEQMA4GA1UEAwwHZXhhbXBsZTAeFw0yNTA1MTgxMDAwMDBaFw0yNjA1MTgxMDAw\n" +
+        "MDBaMBIxEDAOBgNVBAMMB2V4YW1wbGUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNC\n" +
+        "AAQ7X+l7vmQv/Oa5FvjgX+IMYxGPrF+WWiZpWKEHb65PgEBrmB12a+xW3sG32F47\n" +
+        "PMxTGDRb0VemSkMjwbKZovE8oyMwITAOBgNVHQ8BAf8EBAMCAqQwDwYDVR0TAQH/\n" +
+        "BAUwAwEB/zAKBggqhkjOPQQDAgNJADBGAiEA2gbs4ZlMwUvm66wHC+5hNQkN3+Zh\n" +
+        "R5B6uxUiE32xAxcCIQDyFqWhFy2HxS1G3ZKCR8Z0K+H0NB8pCltY9w1NRhZ5Zg==\n" +
+        "-----END CERTIFICATE-----";
 
