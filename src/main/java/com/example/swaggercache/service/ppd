@@ -414,4 +414,266 @@ String samplePem = "-----BEGIN CERTIFICATE-----\n" +
         "BAUwAwEB/zAKBggqhkjOPQQDAgNJADBGAiEA2gbs4ZlMwUvm66wHC+5hNQkN3+Zh\n" +
         "R5B6uxUiE32xAxcCIQDyFqWhFy2HxS1G3ZKCR8Z0K+H0NB8pCltY9w1NRhZ5Zg==\n" +
         "-----END CERTIFICATE-----";
+mport static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariConfig;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+public class DataSourceConfigTest {
+
+    @Mock
+    private DataSourcePropsConfig dsPropConfig;
+
+    @InjectMocks
+    private DataSourceConfig dataSourceConfig;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
+
+    @Test
+    void testHikariDataSource() {
+        // Arrange: mock the configuration values
+        when(dsPropConfig.getUrl()).thenReturn("jdbc:h2:mem:testdb");
+        when(dsPropConfig.getUser()).thenReturn("sa");
+        when(dsPropConfig.getPwd()).thenReturn("password");
+
+        // Act
+        HikariDataSource dataSource = dataSourceConfig.hikariDataSource();
+
+        // Assert
+        assertEquals("jdbc:h2:mem:testdb", dataSource.getJdbcUrl());
+        assertEquals("sa", dataSource.getUsername());
+        assertEquals("password", dataSource.getPassword());
+    }
+}
+<dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-core</artifactId>
+    <version>5.8.0</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.10.0</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>com.zaxxer</groupId>
+    <artifactId>HikariCP</artifactId>
+    <version>5.1.0</version>
+</dependency>
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.when;
+
+import java.time.Duration;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import static org.mockito.Mockito.mockStatic;
+
+public class RedisConfigTest {
+
+    private RedisConfig redisConfig;
+
+    @BeforeEach
+    public void setUp() {
+        redisConfig = new RedisConfig();
+
+        // Set private fields using reflection or manually expose setters for testing
+        redisConfig.redisPassword = "testPwd";
+        redisConfig.timeout = 2000L;
+        redisConfig.masterHost = "localhost";
+        redisConfig.redisPort = 6379;
+        redisConfig.replicaHost = "localhost";
+    }
+
+    @Test
+    public void testRedisConnectionFactory() {
+        LettuceConnectionFactory factory = redisConfig.redisConnectionFactory();
+        assertNotNull(factory);
+        assertNotNull(factory.getStandaloneConfiguration());
+    }
+
+    @Test
+    public void testRedisTemplate() {
+        LettuceConnectionFactory factory = redisConfig.redisConnectionFactory();
+        RedisTemplate<String, String> template = redisConfig.redisTemplate();
+        template.setConnectionFactory(factory);
+
+        assertNotNull(template);
+        assertNotNull(template.getConnectionFactory());
+    }
+}
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+import java.util.Base64;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.junit.jupiter.api.Test;
+
+public class EncryptionUtilTest {
+
+    private static final int IV_LENGTH_BYTE = 12;
+    private static final int TAG_LENGTH_BIT = 128;
+    private static final int SRC_POS = 0;
+    private static final String AES = "AES";
+    private static final String AES_GCM_NO_PADDING = "AES/GCM/NoPadding";
+
+    @Test
+    void testDecryptionFlow() throws Exception {
+        // Prepare
+        String plainText = "hello-world";
+        byte[] iv = new byte[IV_LENGTH_BYTE];
+        byte[] keyBytes = "1234567890123456".getBytes(); // 16 bytes = 128-bit key
+        SecretKey secretKey = new SecretKeySpec(keyBytes, AES);
+
+        // Encrypt (to get encrypted input for test)
+        Cipher cipher = Cipher.getInstance(AES_GCM_NO_PADDING);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmSpec);
+        byte[] encryptedBytes = cipher.doFinal(plainText.getBytes());
+
+        // Combine IV + CipherText
+        byte[] encryptedPayload = new byte[IV_LENGTH_BYTE + encryptedBytes.length];
+        System.arraycopy(iv, 0, encryptedPayload, 0, IV_LENGTH_BYTE);
+        System.arraycopy(encryptedBytes, 0, encryptedPayload, IV_LENGTH_BYTE, encryptedBytes.length);
+        String encryptedBase64 = Base64.getEncoder().encodeToString(encryptedPayload);
+
+        // Act (directly test decVal)
+        String decrypted = callDecVal(encryptedBase64, secretKey);
+
+        // Assert
+        assertEquals(plainText, decrypted);
+    }
+
+    // Simulated version of your decVal method
+    private String callDecVal(String encStr, SecretKey secretKey) {
+        try {
+            byte[] combinedData = Base64.getDecoder().decode(encStr.trim());
+            byte[] iv = new byte[IV_LENGTH_BYTE];
+            System.arraycopy(combinedData, SRC_POS, iv, 0, IV_LENGTH_BYTE);
+            byte[] cipherText = new byte[combinedData.length - IV_LENGTH_BYTE];
+            System.arraycopy(combinedData, IV_LENGTH_BYTE, cipherText, SRC_POS, cipherText.length);
+            Cipher cipher = Cipher.getInstance(AES_GCM_NO_PADDING);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmSpec);
+            byte[] decryptedBytes = cipher.doFinal(cipherText);
+            return new String(decryptedBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
+}
+private static final int IV_LENGTH_BYTE = 12;
+private static final int TAG_LENGTH_BIT = 128;
+private static final int SRC_POS = 0;
+private static final String AES = "AES";
+private static final String AES_GCM_NO_PADDING = "AES/GCM/NoPadding";
+
+
+
+
+@WebMvcTest
+
+MockMvc
+
+TestSecurityContext
+
+spring-security-test
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest
+public class SecurityConfigTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private YourController controller; // Mock all controller dependencies for isolated security testing
+
+    @Test
+    public void testHealthEndpointShouldBePublic() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+               .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "acujwksReadRole")
+    public void testReadJwksEndpointWithProperRole() throws Exception {
+        mockMvc.perform(get("/v1/cert/some-cert-id"))
+               .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "WRONG_ROLE")
+    public void testReadJwksEndpointWithWrongRole() throws Exception {
+        mockMvc.perform(get("/v1/cert/some-cert-id"))
+               .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "acujwksUpdateRole")
+    public void testPutJwksEndpointWithUpdateRole() throws Exception {
+        mockMvc.perform(get("/v1/cert/some-cert-id").with(request -> {
+            request.setMethod("PUT");
+            return request;
+        })).andExpect(status().isOk());
+    }
+
+    @Test
+    public void testJwtAuthenticationConverterCreation() {
+        SecurityConfig config = new SecurityConfig(); // Replace with your actual config class name
+        assert config.getJwtAuthenticationConverter() != null;
+    }
+
+    @Test
+    public void testJwtAuthoritiesConverter() {
+        SecurityConfig config = new SecurityConfig(); // Replace with your actual config class name
+        assert config.getJwtGrantedAuthoritiesConverter() != null;
+    }
+}
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
